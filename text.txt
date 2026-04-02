@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CareTrack – Navdeep Kaur Monitor</title>
+  <link href="style.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="profile-circle">
+        <span id="profileInitial">N</span>
+      </div>
+      <div class="profile-info">
+        <h3 id="profileName">Navdeep Kaur</h3>
+        <span class="status-dot online"></span><small>Monitored</small>
+      </div>
+    </div>
+    <nav class="nav">
+      <button class="nav-btn active" data-tab="dashboard">Dashboard</button>
+      <button class="nav-btn" data-tab="location">Location</button>
+      <button class="nav-btn" data-tab="driving">Driving History</button>
+      <button class="nav-btn" data-tab="voice">Voice Recordings</button>
+      <button class="nav-btn" data-tab="camera">Camera & Photos</button>
+      <button class="nav-btn" data-tab="social">Social Media</button>
+      <button class="nav-btn" data-tab="activity">Activity Log</button>
+      <button class="nav-btn" data-tab="weekly">Weekly Report</button>
+      <button class="nav-btn" data-tab="settings">Settings</button>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <button class="menu-btn" id="menuToggle">&#9776;</button>
+      <h2 id="pageTitle">Dashboard</h2>
+      <div class="topbar-right">
+        <span id="currentDate"></span>
+        <button class="btn btn-sm btn-danger" id="emergencyBtn">🚨 Emergency</button>
+      </div>
+    </header>
+
+    <section class="tab active" id="tab-dashboard">
+      <div class="cards-row">
+        <div class="card stat-card">
+          <div class="stat-icon loc">📍</div>
+          <div>
+            <div class="stat-val" id="stat-location">Unknown</div>
+            <div class="stat-label">Current Location</div>
+          </div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-icon rec">🎙️</div>
+          <div>
+            <div class="stat-val" id="stat-recordings">0</div>
+            <div class="stat-label">Voice Recordings</div>
+          </div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-icon cam">📷</div>
+          <div>
+            <div class="stat-val" id="stat-photos">0</div>
+            <div class="stat-label">Photos Taken</div>
+          </div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-icon soc">📱</div>
+          <div>
+            <div class="stat-val" id="stat-social">0</div>
+            <div class="stat-label">Social Activities</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="card">
+          <h3 class="card-title">Today's Timeline</h3>
+          <div id="todayTimeline" class="timeline">
+            <div class="empty-state">No activities logged yet today.</div>
+          </div>
+        </div>
+        <div class="card">
+          <h3 class="card-title">Quick Log</h3>
+          <div class="quick-log">
+            <select id="quickType" class="input">
+              <option value="general">General Note</option>
+              <option value="social">Social Media Use</option>
+              <option value="mood">Mood/Behavior</option>
+              <option value="medication">Medication</option>
+              <option value="meal">Meal/Food</option>
+              <option value="sleep">Sleep</option>
+            </select>
+            <textarea id="quickNote" class="input" rows="3" placeholder="Describe the activity…"></textarea>
+            <button class="btn btn-primary" id="quickLogBtn">➕ Add to Log</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">Care Team Members</h3>
+        <div class="care-team" id="careTeam"></div>
+      </div>
+    </section>
+
+    <section class="tab" id="tab-location">
+      <div class="card">
+        <h3 class="card-title">Current Location</h3>
+        <div class="location-bar">
+          <button class="btn btn-primary" id="getLocationBtn">📍 Get Current Location</button>
+          <span id="locationStatus" class="status-text"></span>
+        </div>
+        <div id="map" style="height:350px;border-radius:8px;margin-top:12px;"></div>
+        <div id="locationDetails" class="location-details" style="display:none">
+          <div class="loc-row"><b>Place:</b> <span id="locPlace"></span></div>
+          <div class="loc-row"><b>Time:</b> <span id="locTime"></span></div>
+          <button class="btn btn-sm btn-secondary" id="saveLocationBtn">💾 Save Location</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3 class="card-title">Location History</h3>
+        <div id="locationHistory" class="list-container">
+          <div class="empty-state">No saved locations yet.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="tab" id="tab-driving">
+      <div class="card">
+        <h3 class="card-title">Log a Trip</h3>
+        <div class="form-grid">
+          <label>Date & Time
+            <input type="datetime-local" id="tripDate" class="input" />
+          </label>
+          <label>From
+            <input type="text" id="tripFrom" class="input" placeholder="Click to auto-fill current location" />
+          </label>
+          <label>To
+            <input type="text" id="tripTo" class="input" placeholder="Click to auto-fill current location" />
+          </label>
+          <label>Distance (km)
+            <input type="number" id="tripDist" class="input" placeholder="0" min="0" step="0.1" />
+          </label>
+          <label>Driver / Companion
+            <input type="text" id="tripDriver" class="input" placeholder="Who drove her?" />
+          </label>
+        </div>
+        <button class="btn btn-primary" id="saveTripBtn">🚗 Save Trip</button>
+      </div>
+      <div class="card">
+        <h3 class="card-title">Trip History</h3>
+        <div id="tripHistory" class="list-container">
+          <div class="empty-state">No trips logged yet.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="tab" id="tab-voice">
+      <div class="card">
+        <h3 class="card-title">Record Voice Note</h3>
+        <div class="recorder-box">
+          <div class="rec-timer" id="recTimer">00:00</div>
+          <div class="rec-controls">
+            <button class="btn btn-danger rec-btn" id="startRecBtn">🎙️ Start Recording</button>
+            <button class="btn btn-secondary" id="stopRecBtn" disabled>⏹ Stop</button>
+          </div>
+          <div style="margin-top:12px">
+            <label>Label:
+              <input type="text" id="recLabel" class="input" placeholder="e.g. Morning check-in" />
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h3 class="card-title">Saved Recordings</h3>
+        <div id="recordingsList" class="list-container">
+          <div class="empty-state">No recordings yet.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="tab" id="tab-camera">
+      <div class="card">
+        <h3 class="card-title">Camera</h3>
+        <div class="camera-box">
+          <video id="cameraFeed" autoplay muted playsinline style="display:none;width:100%;border-radius:8px;max-height:350px;"></video>
+          <canvas id="cameraCanvas" style="display:none;"></canvas>
+          <div id="cameraPlaceholder" class="camera-placeholder">📷 Camera not active</div>
+          <div class="camera-controls">
+            <button class="btn btn-primary" id="startCamBtn">📸 Open Camera</button>
+            <button class="btn btn-secondary" id="snapBtn" disabled>📷 Take Photo</button>
+            <button class="btn btn-danger" id="stopCamBtn" disabled>✖ Close</button>
+          </div>
+          <div style="margin-top:10px">
+            <label>Photo label:
+              <input type="text" id="photoLabel" class="input" placeholder="e.g. Morning at home" />
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h3 class="card-title">Photo Gallery</h3>
+        <div id="photoGallery" class="photo-grid">
+          <div class="empty-state">No photos taken yet.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="tab" id="tab-social">
+      <div class="card">
+        <h3 class="card-title">Log Social Media Activity</h3>
+        <div class="form-grid">
+          <label>Platform
+            <select id="socialPlatform" class="input">
+              <option value="whatsapp">WhatsApp</option>
+              <option value="instagram">Instagram</option>
+              <option value="facebook">Facebook</option>
+              <option value="youtube">YouTube</option>
+            </select>
+          </label>
+          <label>Date & Time
+            <input type="datetime-local" id="socialDate" class="input" />
+          </label>
+          <label>Duration (minutes)
+            <input type="number" id="socialDuration" class="input" placeholder="0" min="0" />
+          </label>
+          <label>Activity
+            <select id="socialActivity" class="input">
+              <option value="browsing">Browsing/Scrolling</option>
+              <option value="messaging">Messaging / Calling</option>
+              <option value="video">Watching Videos</option>
+              <option value="received_call">Received Call</option>
+              <option value="made_call">Made Call</option>
+            </select>
+          </label>
+          <label>Contact / Person
+            <input type="text" id="socialContact" class="input" placeholder="Who did she talk to?" />
+          </label>
+        </div>
+        <button class="btn btn-primary" id="saveSocialBtn">📱 Save Activity</button>
+      </div>
+      <div class="card">
+        <h3 class="card-title">Social Media History</h3>
+        <div id="socialHistory" class="list-container">
+          <div class="empty-state">No social media activity logged yet.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="tab" id="tab-activity">
+      <div class="card">
+        <h3 class="card-title">Add Activity</h3>
+        <div class="form-grid">
+          <label>Date & Time
+            <input type="datetime-local" id="actDate" class="input" />
+          </label>
+          <label>Category
+            <select id="actCategory" class="input">
+              <option value="general">General Note</option>
+              <option value="mood">Mood / Behavior</option>
+              <option value="medication">Medication</option>
+              <option value="meal">Meal / Food</option>
+              <option value="sleep">Sleep</option>
+              <option value="visitor">Visitor</option>
+            </select>
+          </label>
+          <label style="grid-column:1/-1">Description
+            <textarea id="actDescription" class="input" rows="3" placeholder="Describe what happened…"></textarea>
+          </label>
+        </div>
+        <button class="btn btn-primary" id="saveActBtn">📋 Save Activity</button>
+      </div>
+      <div class="card">
+        <h3 class="card-title">Activity Log</h3>
+        <div id="activityLog" class="list-container">
+          <div class="empty-state">No activities logged yet.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="tab" id="tab-weekly">
+      <div class="card">
+        <h3 class="card-title">Weekly Summary</h3>
+        <div class="filter-row">
+          <label>Week starting:
+            <input type="date" id="weekStart" class="input input-sm" />
+          </label>
+          <button class="btn btn-primary btn-sm" id="genReportBtn">📊 Generate Report</button>
+        </div>
+      </div>
+      <div id="weeklyReport" class="weekly-report-area">
+        <div class="empty-state">Select a week and click Generate Report.</div>
+      </div>
+    </section>
+
+    <section class="tab" id="tab-settings">
+      <div class="card">
+        <h3 class="card-title">Daughter's Profile</h3>
+        <div class="form-grid">
+          <label>Name
+            <input type="text" id="settName" class="input" value="Navdeep Kaur" />
+          </label>
+          <label>Emergency Contact (Father)
+            <input type="text" id="settFatherPhone" class="input" value="09099676037" />
+          </label>
+        </div>
+        <button class="btn btn-primary" id="saveProfileBtn">💾 Save Profile</button>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">Care Team</h3>
+        <div id="careTeamList" class="list-container"></div>
+      </div>
+    </section>
+  </main>
+
+  <div class="modal-overlay" id="emergencyModal" style="display:none">
+    <div class="modal">
+      <h2>🚨 Emergency Alert</h2>
+      <div id="emergencyContacts" class="emergency-contacts"></div>
+      <button class="btn btn-danger" id="closeEmergency">Close</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script type="module" src="script.js"></script>
+</body>
+</html>

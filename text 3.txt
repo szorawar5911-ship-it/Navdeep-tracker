@@ -1,0 +1,528 @@
+const DB = {
+  get: (k) => { try { return JSON.parse(localStorage.getItem(k)) || []; } catch { return []; } },
+  getObj: (k) => { try { return JSON.parse(localStorage.getItem(k)) || {}; } catch { return {}; } },
+  set: (k, v) => localStorage.setItem(k, JSON.stringify(v)),
+  push: (k, item) => { const arr = DB.get(k); arr.unshift(item); DB.set(k, arr); return arr; }
+};
+
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => document.querySelectorAll(sel);
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
+
+const fmtDate = (d) => new Date(d).toLocaleString('en-US', {
+  month: 'long', day: 'numeric', year: 'numeric',
+  hour: 'numeric', minute: '2-digit', hour12: true
+});
+const fmtTime = (d) => new Date(d).toLocaleTimeString('en-US', {
+  hour: 'numeric', minute: '2-digit', hour12: true
+});
+const today = () => new Date().toISOString().slice(0, 10);
+
+function toast(msg, dur = 2800) {
+  const el = $('#toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), dur);
+}
+
+function formatDuration(secs) {
+  const m = String(Math.floor(secs / 60)).padStart(2, '0');
+  const s = String(secs % 60).padStart(2, '0');
+  return `${m}:${s}`;
+}
+
+// AUTOMATIC REVERSE GEOCODING - GETS REAL PLACE NAME
+async function getPlaceName(lat, lng) {
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`);
+    const data = await res.json();
+    // Returns full address like "NH-48, Gurugram, Haryana, India" or "Radisson Blu Hotel, Delhi"
+    return data.display_name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  } catch (e) {
+    return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  }
+}
+
+// PRE-LOAD DATA - NAVDEEP KAUR'S DETAILS
+function initDefaultData() {
+  if (!DB.getObj('profile').name) {
+    DB.set('profile', {
+      name: 'Navdeep Kaur',
+      fatherPhone: '09099676037',
+      childPhones: ['+919815865658', '+919915865658', '+919878655658'],
+      childEmails: [
+        'navdeepkaur_25@gmail.com',
+        'navdeepkaurg1976@gmail.com',
+        'rajigattudaru@rediffmail.com',
+        'nav2525@gmail.com',
+        'nav2525nav@gmail.com',
+        'navdeep.kaur.25@gmail.com'
+      ],
+      devices: ['iPhone 16 Pro', 'Android Samsung', 'iPhone 15 Pro Max']
+    });
+  }
+  if (DB.get('careTeam').length === 0) {
+    DB.set('careTeam', [
+      { id: uid(), name: 'Baledev', role: 'Family', phone: '07503706069' },
+      { id: uid(), name: 'Ballu_Debi', role: 'Family', phone: '08882722686' },
+      { id: uid(), name: 'Ravinder Suman', role: 'Family', phone: '08360406044' },
+      { id: uid(), name: 'Gagandeep Kaur', role: 'Family', phone: '09676519799' }
+    ]);
+  }
+}
+initDefaultData();
+
+// NAVIGATION
+$$('.nav-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.tab;
+    $$('.nav-btn').forEach(b => b.classList.remove('active'));
+    $$('.tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    $(`#tab-${tab}`).classList.add('active');
+    $('#pageTitle').textContent = btn.textContent;
+  });
+});
+
+$('#menuToggle').addEventListener('click', () => {
+  $('#sidebar').classList.toggle('open');
+});
+
+$('#currentDate').textContent = new Date().toLocaleDateString('en-US', {
+  weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+});
+
+// PROFILE
+function loadProfile() {
+  const p = DB.getObj('profile');
+  $('#profileName').textContent = p.name;
+  $('#profileInitial').textContent = p.name[0].toUpperCase();
+  $('#settName').value = p.name;
+  $('#settFatherPhone').value = p.fatherPhone || '';
+}
+loadProfile();
+
+$('#saveProfileBtn').addEventListener('click', () => {
+  const current = DB.getObj('profile');
+  DB.set('profile', {
+    name: $('#settName').value || 'Navdeep Kaur',
+    fatherPhone: $('#settFatherPhone').value,
+    childPhones: current.childPhones,
+    childEmails: current.childEmails,
+    devices: current.devices
+  });
+  loadProfile();
+  toast('✅ Profile saved!');
+});
+
+// CARE TEAM
+function renderCareTeam() {
+  const team = DB.get('careTeam');
+  $('#careTeam').innerHTML = team.map(m => `
+    <div class="care-card">
+      <div class="care-avatar">${m.name[0].toUpperCase()}</div>
+      <div>
+        <div class="care-name">${m.name}</div>
+        <div class="care-role">${m.role} · ${m.phone}</div>
+      </div>
+    </div>
+  `).join('');
+  $('#careTeamList').innerHTML = team.map((m, i) => `
+    <div class="list-item">
+      <div>
+        <div class="list-item-title">${m.name}</div>
+        <div class="list-item-sub">${m.role} · ${m.phone}</div>
+      </div>
+      <button class="delete-btn" data-i="${i}" data-list="careTeam">✕</button>
+    </div>
+  `).join('') || '<div class="empty-state">No team members.</div>';
+}
+renderCareTeam();
+
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.delete-btn');
+  if (!btn) return;
+  const list = btn.dataset.list;
+  const i = parseInt(btn.dataset.i);
+  const arr = DB.get(list);
+  arr.splice(i, 1);
+  DB.set(list, arr);
+  if (list === 'careTeam') renderCareTeam();
+  if (list === 'locationHistory') renderLocationHistory();
+  if (list === 'tripHistory') renderTripHistory();
+  if (list === 'recordings') renderRecordings();
+  if (list === 'photos') renderPhotos();
+  if (list === 'socialHistory') renderSocialHistory();
+  if (list === 'activityLog') renderActivityLog();
+  updateDashboard();
+});
+
+// EMERGENCY
+$('#emergencyBtn').addEventListener('click', () => {
+  const p = DB.getObj('profile');
+  const team = DB.get('careTeam');
+  let html = `<div class="emg-contact">👨 Father: ${p.fatherPhone}</div>`;
+  html += `<div class="emg-contact">📱 Child: ${p.childPhones.join(' · ')}</div>`;
+  team.forEach(m => {
+    html += `<div class="emg-contact">👤 ${m.name} (${m.role}): ${m.phone}</div>`;
+  });
+  $('#emergencyContacts').innerHTML = html;
+  $('#emergencyModal').style.display = 'flex';
+});
+$('#closeEmergency').addEventListener('click', () => { $('#emergencyModal').style.display = 'none'; });
+
+// DASHBOARD
+function updateDashboard() {
+  $('#stat-recordings').textContent = DB.get('recordings').length;
+  $('#stat-photos').textContent = DB.get('photos').length;
+  $('#stat-social').textContent = DB.get('socialHistory').length;
+  const lastLoc = DB.get('locationHistory')[0];
+  $('#stat-location').textContent = lastLoc? lastLoc.label : 'Unknown';
+  renderTodayTimeline();
+}
+
+function renderTodayTimeline() {
+  const todayStr = today();
+  const all = [
+...DB.get('activityLog').map(a => ({...a, type: 'activity', note: a.description, icon: '📋' })),
+...DB.get('locationHistory').map(l => ({...l, type: 'location', note: l.label, date: l.savedAt, icon: '📍' })),
+...DB.get('socialHistory').map(s => ({...s, type: 'social', note: `${s.platform} - ${s.activity}`, date: s.date, icon: '📱' }))
+  ].filter(item => item.date && new Date(item.date).toISOString().slice(0, 10) === todayStr)
+.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  const el = $('#todayTimeline');
+  if (!all.length) { el.innerHTML = '<div class="empty-state">No activities logged yet today.</div>'; return; }
+  el.innerHTML = all.map(item => `
+    <div class="timeline-item">
+      <div class="tl-icon">${item.icon}</div>
+      <div>
+        <div class="tl-title">${item.note}</div>
+        <div class="tl-time">${fmtTime(item.date)}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+$('#quickLogBtn').addEventListener('click', () => {
+  const note = $('#quickNote').value.trim();
+  if (!note) return toast('Please write something first.');
+  DB.push('activityLog', { id: uid(), date: new Date().toISOString(), description: note, category: $('#quickType').value });
+  $('#quickNote').value = '';
+  updateDashboard();
+  renderActivityLog();
+  toast('✅ Logged!');
+});
+
+// LOCATION + MAP WITH REAL PLACE NAMES
+let map, marker, currentPos;
+function initMap(lat, lng) {
+  if (!map) {
+    map = L.map('map').setView([lat, lng], 15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap'
+    }).addTo(map);
+    map.on('click', async (e) => {
+      const placeName = await getPlaceName(e.latlng.lat, e.latlng.lng);
+      L.popup().setLatLng(e.latlng).setContent(placeName).openOn(map);
+    });
+  } else {
+    map.setView([lat, lng], 15);
+  }
+  if (marker) marker.remove();
+  marker = L.marker([lat, lng]).addTo(map);
+}
+
+$('#getLocationBtn').addEventListener('click', async () => {
+  if (location.protocol!== 'https:' && location.hostname!== 'localhost') {
+    $('#locationStatus').textContent = '⚠️ Open with https:// (Replit gives you this link)';
+    return toast('Use HTTPS link from Replit');
+  }
+
+  $('#locationStatus').textContent = 'Getting GPS location...';
+  navigator.geolocation.getCurrentPosition(async pos => {
+    const { latitude, longitude } = pos.coords;
+    currentPos = { lat: latitude, lng: longitude, time: new Date().toISOString() };
+
+    $('#locationStatus').textContent = 'Finding exact place name...';
+    const placeName = await getPlaceName(latitude, longitude); // AUTOMATIC
+
+    initMap(latitude, longitude);
+    marker.bindPopup(placeName).openPopup();
+
+    $('#locationDetails').style.display = 'block';
+    $('#locPlace').textContent = placeName; // SHOWS REAL NAME
+    $('#locTime').textContent = fmtTime(currentPos.time);
+    $('#locationStatus').textContent = 'Location found!';
+    toast('✅ ' + placeName);
+  }, err => {
+    $('#locationStatus').textContent = 'Failed: ' + err.message;
+    toast('Allow location access');
+  }, { enableHighAccuracy: true, timeout: 10000 });
+});
+
+$('#saveLocationBtn').addEventListener('click', () => {
+  if (!currentPos) return toast('Get location first');
+  DB.push('locationHistory', {
+    id: uid(),
+    lat: currentPos.lat,
+    lng: currentPos.lng,
+    label: $('#locPlace').textContent, // SAVES REAL NAME
+    savedAt: new Date().toISOString()
+  });
+  renderLocationHistory();
+  updateDashboard();
+  toast('✅ Location saved!');
+});
+
+function renderLocationHistory() {
+  const list = DB.get('locationHistory');
+  $('#locationHistory').innerHTML = list.map((l, i) => `
+    <div class="list-item">
+      <div>
+        <div class="list-item-title">${l.label}</div>
+        <div class="list-item-sub">${fmtDate(l.savedAt)}</div>
+      </div>
+      <button class="delete-btn" data-i="${i}" data-list="locationHistory">✕</button>
+    </div>
+  `).join('') || '<div class="empty-state">No saved locations yet.</div>';
+}
+
+// DRIVING - AUTO FILL WITH CURRENT PLACE NAME
+$('#tripFrom').addEventListener('click', async () => {
+  if (currentPos) {
+    $('#tripFrom').value = $('#locPlace').textContent || await getPlaceName(currentPos.lat, currentPos.lng);
+  }
+});
+$('#tripTo').addEventListener('click', async () => {
+  if (currentPos) {
+    $('#tripTo').value = $('#locPlace').textContent || await getPlaceName(currentPos.lat, currentPos.lng);
+  }
+});
+
+$('#saveTripBtn').addEventListener('click', () => {
+  const trip = {
+    id: uid(),
+    date: $('#tripDate').value,
+    from: $('#tripFrom').value,
+    to: $('#tripTo').value,
+    dist: $('#tripDist').value,
+    driver: $('#tripDriver').value
+  };
+  if (!trip.date ||!trip.from ||!trip.to) return toast('Fill date, from and to');
+  DB.push('tripHistory', trip);
+  renderTripHistory();
+  toast('✅ Trip saved!');
+  ['tripDate','tripFrom','tripTo','tripDist','tripDriver'].forEach(id => $(`#${id}`).value = '');
+});
+
+function renderTripHistory() {
+  const list = DB.get('tripHistory');
+  $('#tripHistory').innerHTML = list.map((t, i) => `
+    <div class="list-item">
+      <div>
+        <div class="list-item-title">${t.from} → ${t.to} (${t.dist} km)</div>
+        <div class="list-item-sub">${fmtDate(t.date)} · Driver: ${t.driver}</div>
+      </div>
+      <button class="delete-btn" data-i="${i}" data-list="tripHistory">✕</button>
+    </div>
+  `).join('') || '<div class="empty-state">No trips logged yet.</div>';
+}
+
+// VOICE RECORDINGS
+let mediaRecorder, audioChunks = [], recStart, recInterval;
+$('#startRecBtn').addEventListener('click', async () => {
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  mediaRecorder = new MediaRecorder(stream);
+  audioChunks = [];
+  mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+  mediaRecorder.onstop = () => {
+    const blob = new Blob(audioChunks, { type: 'audio/webm' });
+    const url = URL.createObjectURL(blob);
+    DB.push('recordings', {
+      id: uid(),
+      label: $('#recLabel').value || 'Recording',
+      url,
+      duration: Math.floor((Date.now() - recStart) / 1000),
+      date: new Date().toISOString()
+    });
+    renderRecordings();
+    updateDashboard();
+    toast('✅ Recording saved!');
+    $('#recLabel').value = '';
+  };
+  mediaRecorder.start();
+  recStart = Date.now();
+  $('#startRecBtn').disabled = true;
+  $('#stopRecBtn').disabled = false;
+  recInterval = setInterval(() => {
+    $('#recTimer').textContent = formatDuration(Math.floor((Date.now() - recStart) / 1000));
+  }, 1000);
+});
+
+$('#stopRecBtn').addEventListener('click', () => {
+  mediaRecorder.stop();
+  mediaRecorder.stream.getTracks().forEach(t => t.stop());
+  clearInterval(recInterval);
+  $('#recTimer').textContent = '00:00';
+  $('#startRecBtn').disabled = false;
+  $('#stopRecBtn').disabled = true;
+});
+
+function renderRecordings() {
+  const list = DB.get('recordings');
+  $('#recordingsList').innerHTML = list.map((r, i) => `
+    <div class="list-item">
+      <div style="flex:1">
+        <div class="list-item-title">${r.label} (${formatDuration(r.duration)})</div>
+        <div class="list-item-sub">${fmtDate(r.date)}</div>
+        <audio class="audio-player" controls src="${r.url}"></audio>
+      </div>
+      <button class="delete-btn" data-i="${i}" data-list="recordings">✕</button>
+    </div>
+  `).join('') || '<div class="empty-state">No recordings yet.</div>';
+}
+
+// CAMERA
+let camStream;
+$('#startCamBtn').addEventListener('click', async () => {
+  camStream = await navigator.mediaDevices.getUserMedia({ video: true });
+  $('#cameraFeed').srcObject = camStream;
+  $('#cameraFeed').style.display = 'block';
+  $('#cameraPlaceholder').style.display = 'none';
+  $('#snapBtn').disabled = false;
+  $('#stopCamBtn').disabled = false;
+  $('#startCamBtn').disabled = true;
+});
+
+$('#snapBtn').addEventListener('click', () => {
+  const video = $('#cameraFeed');
+  const canvas = $('#cameraCanvas');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  const url = canvas.toDataURL('image/png');
+  DB.push('photos', {
+    id: uid(),
+    label: $('#photoLabel').value || 'Photo',
+    url,
+    date: new Date().toISOString()
+  });
+  renderPhotos();
+  updateDashboard();
+  toast('✅ Photo saved!');
+  $('#photoLabel').value = '';
+});
+
+$('#stopCamBtn').addEventListener('click', () => {
+  camStream.getTracks().forEach(t => t.stop());
+  $('#cameraFeed').style.display = 'none';
+  $('#cameraPlaceholder').style.display = 'flex';
+  $('#snapBtn').disabled = true;
+  $('#stopCamBtn').disabled = true;
+  $('#startCamBtn').disabled = false;
+});
+
+function renderPhotos() {
+  const list = DB.get('photos');
+  $('#photoGallery').innerHTML = list.map((p, i) => `
+    <div class="photo-item">
+      <img src="${p.url}" alt="${p.label}">
+      <div class="photo-caption">${p.label}</div>
+      <button class="photo-del delete-btn" data-i="${i}" data-list="photos">✕</button>
+    </div>
+  `).join('') || '<div class="empty-state">No photos taken yet.</div>';
+}
+
+// SOCIAL MEDIA
+$('#saveSocialBtn').addEventListener('click', () => {
+  const s = {
+    id: uid(),
+    platform: $('#socialPlatform').value,
+    date: $('#socialDate').value,
+    duration: $('#socialDuration').value,
+    activity: $('#socialActivity').value,
+    contact: $('#socialContact').value
+  };
+  if (!s.date) return toast('Select date/time');
+  DB.push('socialHistory', s);
+  renderSocialHistory();
+  updateDashboard();
+  toast('✅ Activity saved!');
+});
+
+function renderSocialHistory() {
+  const list = DB.get('socialHistory');
+  $('#socialHistory').innerHTML = list.map((s, i) => `
+    <div class="list-item">
+      <div>
+        <div class="list-item-title">${s.platform} - ${s.activity} ${s.contact? 'with ' + s.contact : ''}</div>
+        <div class="list-item-sub">${fmtDate(s.date)} · ${s.duration || 0} min</div>
+      </div>
+      <button class="delete-btn" data-i="${i}" data-list="socialHistory">✕</button>
+    </div>
+  `).join('') || '<div class="empty-state">No social media activity logged yet.</div>';
+}
+
+// ACTIVITY LOG
+$('#saveActBtn').addEventListener('click', () => {
+  const a = {
+    id: uid(),
+    date: $('#actDate').value,
+    category: $('#actCategory').value,
+    description: $('#actDescription').value
+  };
+  if (!a.date ||!a.description) return toast('Fill date and description');
+  DB.push('activityLog', a);
+  renderActivityLog();
+  updateDashboard();
+  toast('✅ Activity saved!');
+  $('#actDescription').value = '';
+});
+
+function renderActivityLog() {
+  const list = DB.get('activityLog');
+  $('#activityLog').innerHTML = list.map((a, i) => `
+    <div class="list-item">
+      <div>
+        <div class="list-item-title">${a.description}</div>
+        <div class="list-item-sub">${a.category} · ${fmtDate(a.date)}</div>
+      </div>
+      <button class="delete-btn" data-i="${i}" data-list="activityLog">✕</button>
+    </div>
+  `).join('') || '<div class="empty-state">No activities logged yet.</div>';
+}
+
+// WEEKLY REPORT
+$('#genReportBtn').addEventListener('click', () => {
+  const start = new Date($('#weekStart').value);
+  if (isNaN(start)) return toast('Pick a start date');
+  const end = new Date(start);
+  end.setDate(end.getDate() + 7);
+
+  const filterWeek = (arr, key) => arr.filter(x => {
+    const d = new Date(x[key]);
+    return d >= start && d < end;
+  });
+
+  const trips = filterWeek(DB.get('tripHistory'), 'date');
+  const social = filterWeek(DB.get('socialHistory'), 'date');
+  const acts = filterWeek(DB.get('activityLog'), 'date');
+
+  $('#weeklyReport').innerHTML = `
+    <div class="report-card">
+      <div class="report-section-title">Week of ${fmtTime(start)} - ${fmtTime(end)}</div>
+      <p><b>Trips:</b> ${trips.length} (${trips.reduce((s,t) => s + (parseFloat(t.dist)||0), 0).toFixed(1)} km)</p>
+      <p><b>Social Activities:</b> ${social.length}</p>
+      <p><b>Other Activities:</b> ${acts.length}</p>
+    </div>
+  `;
+});
+
+// INITIAL RENDER
+renderLocationHistory();
+renderTripHistory();
+renderRecordings();
+renderPhotos();
+renderSocialHistory();
+renderActivityLog();
+updateDashboard();
